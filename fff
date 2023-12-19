@@ -79,14 +79,10 @@ setup_options() {
     }
 
     # Format for marked files.
-    # Use affixes provided by the user or use defaults, if necessary.
-    if [[ $FFF_MARK_FORMAT == *%f* ]]; then
+    [[ $FFF_MARK_FORMAT == *%f* ]] && {
         mark_pre=${FFF_MARK_FORMAT/'%f'*}
         mark_post=${FFF_MARK_FORMAT/*'%f'}
-    else
-        mark_pre=" "
-        mark_post="*"
-    fi
+    }
 
     # Find supported 'file' arguments.
     file -I &>/dev/null || : "${file_flags:=biL}"
@@ -200,12 +196,12 @@ read_dir() {
     for item in "$PWD"/*; do
         if [[ -d $item ]]; then
             dirs+=("$item")
+            ((item_index++))
 
             # Find the position of the child directory in the
             # parent directory list.
             [[ $item == "$OLDPWD" ]] &&
                 ((previous_index=item_index))
-            ((item_index++))
         else
             files+=("$item")
         fi
@@ -278,7 +274,7 @@ print_line() {
 
     # Color files based on file extension and LS_COLORS.
     # Check if file extension adheres to POSIX naming
-    # standard before checking if it's a variable.
+    # stardard before checking if it's a variable.
     elif [[ $FFF_LS_COLORS == 1 &&
             $file_ext != "$file_name" &&
             $file_ext =~ ^[a-zA-Z0-9_]*$ ]]; then
@@ -295,8 +291,8 @@ print_line() {
 
     # If the list item is marked for operation.
     [[ ${marked_files[$1]} == "${list[$1]:-null}" ]] && {
-        format+=\\e[3${FFF_COL3:-1}m${mark_pre}
-        suffix+=${mark_post}
+        format+=\\e[3${FFF_COL3:-1}m${mark_pre:= }
+        suffix+=${mark_post:=*}
     }
 
     # Escape the directory string.
@@ -317,7 +313,7 @@ draw_dir() {
     # When going up the directory tree, place the cursor on the position
     # of the previous directory.
     ((find_previous == 1)) && {
-        ((scroll_start=previous_index))
+        ((scroll_start=previous_index-1))
         ((scroll=scroll_start))
 
         # Clear the directory history. We're here now.
@@ -330,7 +326,7 @@ draw_dir() {
         ((scroll_end=max_items))
         ((scroll_new_pos=scroll+1))
 
-    # If current dir is near the end of the list, keep scroll position.
+    # If curent dir is near the end of the list, keep scroll position.
     elif ((list_total - scroll < max_items/2)); then
         ((scroll_start=list_total-max_items+1))
         ((scroll_new_pos=max_items-(list_total-scroll)))
@@ -405,7 +401,7 @@ draw_img() {
     # Get the image size in pixels.
     read -r img_width img_height < <("$w3m" <<< "5;${list[scroll]}")
 
-    # Subtract the status_line area from the image size.
+    # Substract the status_line area from the image size.
     ((HEIGHT=HEIGHT-HEIGHT*5/LINES))
 
     ((img_width > WIDTH)) && {
@@ -782,6 +778,11 @@ key() {
                 find_previous=1
                 open "${PWD%/*}"
             fi
+        ;;
+
+        # VSCODE / Custom code editors
+        ${FFF_KEY_CODE:=v})
+            code "${list[scroll]}"
         ;;
 
         # Scroll down.
